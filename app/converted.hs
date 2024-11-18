@@ -45,7 +45,7 @@ safedivision a0 =
                    ( return bl4 `eapp` return ())
                bl4 _ = do 
                    return (a0  `div`  b0)
-           t11 <- ( ( == ) <$> return b0 <*> return 0)
+           t11 <- return (b0  ==  0)
            if t11
            then ( return bl3 `eapp` return ())
            else ( return bl4 `eapp` return ())
@@ -78,7 +78,7 @@ fibonnaci n0 = do
           let bl3 _ = do 
                   y1 <- return 1
                   let bl4 _ = do 
-                          z1 <- return 3
+                          z1 <- return 1
                           let bl5 z2 = 
                                   return $ \y2 -> 
                                   return $ \x2 -> 
@@ -91,7 +91,7 @@ fibonnaci n0 = do
                                                   let bl8 _ = do 
                                                           y3 <- return w2
                                                           let bl9 _ = do 
-                                                                  z3 <- ( ( + ) <$> return z2 <*> return 1)
+                                                                  z3 <- return (z2  +  1)
                                                                   ((((( return bl5 `eapp` return z3) `eapp` return y3) `eapp` return x3) `eapp` return w2) `eapp` return ())
                                                           ( return bl9 `eapp` return ())
                                                   ( return bl8 `eapp` return ())
@@ -102,7 +102,7 @@ fibonnaci n0 = do
                                   if t34
                                   then ( return bl6 `eapp` return ())
                                   else ( return bl10 `eapp` return ())
-                          ((((( return bl5 `eapp` return z1) `eapp` return y1) `eapp` return x1) `eapp` ( return error `eapp` return "uninitialized")) `eapp` return ())
+                          ((((( return bl5 `eapp` return z1) `eapp` return y1) `eapp` return x1) `eapp` return (error "uninitialized")) `eapp` return ())
                   ( return bl4 `eapp` return ())
           ( return bl3 `eapp` return ())
   ( return bl2 `eapp` return ())
@@ -178,7 +178,7 @@ foo threshold0 = do
                   let bl4 _ = do 
                           j1 <- (( return sla `eapp` return "\"oi\"") `eapp` return 2)
                           let bl5 _ = do 
-                                  _ <- ( return set `eapp` ( ( + ) <$> return i1 <*> return 1))
+                                  _ <- ( return set `eapp` return (i1  +  1))
                                   let bl6 _ = do 
                                           let bl7 _ = do 
                                                   ( return xor `eapp` return ())

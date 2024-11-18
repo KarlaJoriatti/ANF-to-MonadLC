@@ -68,7 +68,7 @@ fibonnaci = \n0 ->
       (bl4 ())
       where {
        bl4 _ =
-        let z1 = 3 in
+        let z1 = 1 in
         (((((bl5 z1) y1) x1) (error "uninitialized")) ())
         where {
          bl5 z2 y2 x2 w1 _ =

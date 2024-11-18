@@ -90,6 +90,11 @@ functionTranslator expr =
                indent
                emit "else "
                worker e'
+           worker (Application (Free "error") (Text s)) = do
+               emit "return ("
+               emit "error "
+               emit (show s)
+               emit ")"
            worker (Application (Free s) e') = do
                emit "( return "
                emit s
@@ -107,6 +112,18 @@ functionTranslator expr =
                emit s
                emit (" " ++ show op ++ " ")
                emit s'
+               emit ")"
+           worker (Operation op (Free s) (Number n)) = do
+               emit "return ("
+               emit s
+               emit (" " ++ show op ++ " ")
+               emit (show n)
+               emit ")"
+           worker (Operation op (Number n) (Free s)) = do
+               emit "return ("
+               emit (show n)
+               emit (" " ++ show op ++ " ")
+               emit s
                emit ")"
            worker (Operation op e e') = do
                emit "("
