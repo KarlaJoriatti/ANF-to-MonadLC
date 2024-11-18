@@ -40,7 +40,7 @@ data Type = Int
           | Console
           | Row [Effect]
           deriving (Ord, Eq)
-         
+
 type Effect = Type
 
 instance Show Parser.Operator where
@@ -81,11 +81,11 @@ stringLiteral = T.stringLiteral lexico
 
 juntar = foldr (\(a,b) (c,d) -> (a++c, b++d)) ([],[])
 
-partida = do {l <- many bigParser; eof; return (juntar l)}
+partida = do {l <- many1 bigParser; eof; return (juntar l)}
 
-bigParser = try (do {e <- many1 effectParser; funs <- many parseFunctions; hand <- many handlerParse; return (e, funs)})
-           <|> do {funs <- many1 parseFunctions; e <- many effectParser; hand <- many handlerParse; return (e, funs)}
-           <|> do {hand <- many1 handlerParse; e <- many effectParser; funs <- many parseFunctions; return (e, funs)}
+bigParser = try (do {e <- many1 effectParser; return (e, [])})
+           <|> do {funs <- many1 parseFunctions; return ([], funs)}
+           <|> do {hand <- many1 handlerParse; return ([], [])}
 
 pp = do {reservedOp "_"; return ()}
 
@@ -115,41 +115,39 @@ parseFunctions = do (nome, tipo) <- declParser
 
 parseExpr = runParser partida [] "calculus"
 
-varParser = do {i <- identifier; return (Free i)}
+varParser = do {Free <$> identifier;}
 
-textParser = do {i <- stringLiteral; return (Text i)}
+textParser = do {Text <$> stringLiteral;}
 
 lambdaParser = do char '\\'
                   i <- many identifier
                   reservedOp "->"
                   e <- highParser
-                  exp <- constructLambda i e
-                  return exp
-                    
+                  constructLambda i e
+
 unitP = do reservedOp "("
            reservedOp ")"
-           return (UnitValue)
-           
-numberParser = do i <- natural
-                  return (Number i)
-                  
+           return UnitValue
+
+numberParser = do Number <$> natural
+
 trueParser = do reserved "true"
-                return (TrueValue)
+                return TrueValue
 
 falseParser = do reserved "false"
-                 return (FalseValue)
+                 return FalseValue
 
 boolParser = do trueParser
              <|> falseParser
-             
-operator = do {reservedOp "+"; return (Parser.Sum)}
-           <|> do {reservedOp "-"; return (Sub)}
-           <|> do {reservedOp "/"; return (Div)}
-           <|> do {reservedOp "*"; return (Mul)}
-           <|> do {reservedOp "<"; return (Lt)}
-           <|> do {reservedOp ">"; return (Gt)}
-           <|> do {reservedOp "="; return (Eq)}
-           <|> do {reservedOp "=="; return (EqEq)}
+
+operator = do {reservedOp "+"; return Parser.Sum}
+           <|> do {reservedOp "-"; return Sub}
+           <|> do {reservedOp "/"; return Div}
+           <|> do {reservedOp "*"; return Mul}
+           <|> do {reservedOp "<"; return Lt}
+           <|> do {reservedOp ">"; return Gt}
+           <|> do {reservedOp "="; return Eq}
+           <|> do {reservedOp "=="; return EqEq}
 
 opParser = do reservedOp "("
               e <- highParser
@@ -157,22 +155,20 @@ opParser = do reservedOp "("
               e' <- highParser
               reservedOp ")"
               return (Operation i e e')
-                  
+
 ifParser = do reserved "if"
               c <- highParser
               reserved "then"
               e <- highParser
               reserved "else"
-              e' <- highParser
-              return (If c e e')
+              If c e <$> highParser
 
 letParser = do reserved "let"
                i <- identifier
                reservedOp "="
                e <- highParser
                reserved "in"
-               e' <- highParser
-               return (Let i e e')
+               Let i e <$> highParser
 
 bindings = do i <- identifier
               ls <- many identifier
@@ -191,19 +187,17 @@ whereParser = do e <- parseNonApp
 arrowParser = do t <- typeParser
                  reservedOp "\8594" -- arrow
                  e <- eff
-                 t' <- ordParser
-                 return (Arrow t e t')
-                 
-eff = try (do {reserved "console"; return (Console)})
-        <|> try (rowParser)
+                 Arrow t e <$> ordParser
+
+eff = try (do {reserved "console"; return Console})
+        <|> try rowParser
         <|> genericEffect
 
 genericEffect = do (x:xs) <- identifier
-                   return (Generic ((toUpper x):xs))
+                   return (Generic (toUpper x:xs))
 
 ef = do reservedOp ","
-        e <- eff
-        return e
+        eff
 
 rowParser = do reservedOp "<"
                e <- eff
@@ -211,19 +205,15 @@ rowParser = do reservedOp "<"
                reservedOp ">"
                return (Row (e:ls))
 
-genericParser = do i <- identifier
-                   return (Generic i)
+genericParser = do Generic <$> identifier
 
-ordParser = try (arrowParser)
+ordParser = try arrowParser
             <|> typeParser
 
-typeParser = try (do {reserved "bool"; return (Bool)})
-               <|> try (do {reserved "int"; return (Int)})
-               <|> try (do {reserved "unit"; return (Unit)})
-               <|> try (do {reserved "string"; return (String)})
-               -- <|> try (do {reserved "console"; return (Console)})
-               -- <|> try (arrowParser)
-               -- <|> try (rowParser)
+typeParser = try (do {reserved "bool"; return Bool})
+               <|> try (do {reserved "int"; return Int})
+               <|> try (do {reserved "unit"; return Unit})
+               <|> try (do {reserved "string"; return String})
                <|> genericParser
 
 declParser = do i <- identifier
@@ -237,7 +227,7 @@ declParser = do i <- identifier
                 case l of
                   [] -> return (i, t)
                   (x:xs) -> return (i++x, t)
-                
+
 
 effectParser = do reserved "effect"
                   i <- identifier
@@ -250,24 +240,24 @@ constructLambda [] e = return e
 constructLambda [x] e = return (Lambda x e)
 constructLambda (x:xs) e = do e' <- constructLambda xs e
                               return (Lambda x e')
-                              
+
 takeInput (Lambda i e) = (i ++ " " ++ x, y)
-  where (x, y) = takeInput e 
+  where (x, y) = takeInput e
 takeInput e = ("", e)
 
 expr :: Parsec String u Expr
-expr = chainl1 (between spaces spaces highParser) $ return $ Application
+expr = chainl1 (between spaces spaces highParser) $ return Application
 
 appParser = do reservedOp "("
                e <- expr
                reservedOp ")"
                return e
 
-highParser = try (whereParser)
+highParser = try whereParser
              <|> parseNonApp
 
-parseNonApp = try (opParser)
-              <|> try (appParser)
+parseNonApp = try opParser
+              <|> try appParser
               <|> unitP
               <|> ifParser
               <|> numberParser
@@ -276,9 +266,3 @@ parseNonApp = try (opParser)
               <|> letParser
               <|> varParser
               <|> textParser
-
- 
-{-main = do putStrLn "Arquivo: "
-          x <- getLine
-          s <- readFile x
-          parseCalculus s-}

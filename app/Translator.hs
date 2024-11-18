@@ -24,8 +24,16 @@ freshVar = TI (\e -> let v = "t"++show e in (Generic v, e+1))
 
 runTI (TI m) n = let (t, _) = m n in t
 
+-- os tres juntos formam o cabecalho basico
+-- do arquivo de saida
+imports = "{-# LANGUAGE GADTs, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TypeOperators, DataKinds, RankNTypes #-} \nimport Control.Eff\nimport Control.Eff.Extend\nimport Debug.Trace\n\n"
+--"handlerAction :: r ~ (f : r') => (forall v.(f v -> (v -> k) -> k) -> (Eff r a -> k) -> Arrs r v a -> f v -> k)\nhandlerAction f h q elem =\n\tf elem (qComp q h)\n\nmakeHandler :: r ~ (f : r') => (forall v.f v -> (v -> s -> Eff r' b) -> s -> Eff r' b) -> (a -> s -> Eff r' b) -> s -> Eff r a -> Eff r' b\nmakeHandler f g =\n\tPrelude.flip (handle_relay' (handlerAction f) g (Prelude.flip $ makeHandler f g))\n\n"
+eapp = "eapp :: Monad m => m (a -> m b) -> m a -> m b\neapp f x = do\n   res <- f <*> x\n   res\n\n"
+console = "data Console x where\n    Print :: x -> Console ()\n\nprint x = send (Print x)\n\n"
+
+
 functionTranslator expr = 
-    let (_, _, w) = runRWS (worker expr) () (0, 0) in w
+    let (_, _, w) = runRWS (worker expr) () (2, 0) in w
        where
            worker (Free s) = do
                emit "return "
@@ -50,22 +58,10 @@ functionTranslator expr =
                putIndentation j
                indent
                worker e'
-           worker (Lambda i exp@(Lambda x e)) = do
-               saveIndentation
-               j <- getIndentation
-               emit "\\"
-               emit i
-               emit " -> "
-               newline
-               putIndentation j
-               indent
-               emit " "
-               emit "return $ "
-               worker exp
            worker (Lambda i e) = do
                saveIndentation
                j <- getIndentation
-               emit "\\"
+               emit "return $ \\"
                emit i
                emit " -> do"
                newline
@@ -190,49 +186,45 @@ functionTranslator expr =
                 indent
                 emitBindings xs False
 
-cabecalho = "{-# LANGUAGE GADTs, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TypeOperators, DataKinds, RankNTypes #-} \nimport Control.Eff\nimport Control.Eff.Extend\nimport Debug.Trace\n\n"
---"handlerAction :: r ~ (f : r') => (forall v.(f v -> (v -> k) -> k) -> (Eff r a -> k) -> Arrs r v a -> f v -> k)\nhandlerAction f h q elem =\n\tf elem (qComp q h)\n\nmakeHandler :: r ~ (f : r') => (forall v.f v -> (v -> s -> Eff r' b) -> s -> Eff r' b) -> (a -> s -> Eff r' b) -> s -> Eff r a -> Eff r' b\nmakeHandler f g =\n\tPrelude.flip (handle_relay' (handlerAction f) g (Prelude.flip $ makeHandler f g))\n\n"
+-- vai criar restricoes do tipo 'Member e t'
+-- onde e vem de uma effect row
+takeEfs t [a, b] = return ("Member " ++ show a ++ " " ++ show t)
+takeEfs t (e : es) = do b <- takeEfs t es
+                        return ("Member " ++ show e ++ " " ++ show t ++ "," ++ b)
 
-eapp = "eapp :: Monad m => m (a -> m b) -> m a -> m b\neapp f x = do\n   res <- f <*> x\n   res\n\n"
-
-console = "data Console x where\n    Print :: x -> Console ()\n\nprint x = send (Print x)\n\n"
-
-takeEfs t [a, b] = return ([a], "Member " ++ show a ++ " " ++ show t)
-takeEfs t (e : es) = do (a, b) <- takeEfs t es
-                        return (e:a, "Member " ++ show e ++ " " ++ show t ++ "," ++ b)
-
+-- juntar restricoes
 joinStrs a b | null a = b
              | null b = a
              | otherwise = a ++ "," ++ b
 
 
-teste (Row efs) f = do t <- freshVar
-                       case efs of
-                         [x, y] -> if f then return (show x ++ " ", []) else return ("Eff " ++ show t ++ " ", "Member " ++ show x ++ " " ++ show t)
-                         _ -> do (ls, str) <- takeEfs t efs
-                                 return ("Eff " ++ show t ++ " ", str)
-teste (Arrow Unit e t) f = do (a, b) <- teste e f
-                              (a1, b1) <- teste t f
-                              return (a ++ a1, joinStrs b b1)
-teste (Arrow t1 (Generic i) t2@(Arrow a b c)) f = do t <- freshVar
-                                                     (a, b) <- teste t1 f
-                                                     (a2, b2) <- teste t2 f
-                                                     if f 
-                                                     then return (a ++ "-> " ++ a2, joinStrs b b2)
-                                                     else return (a ++ "-> Eff " ++ show t ++ " (" ++ a2 ++ ")", joinStrs b b2)
-teste (Arrow t1 e t2@(Arrow a b c)) f = do (a, b) <- teste t1 f
-                                           (a1, b1) <- teste e f
-                                           (a2, b2) <- teste t2 f
-                                           return (a ++ "-> " ++ a1 ++"("++ a2 ++ ")", joinStrs b (joinStrs b1 b2))
-teste (Arrow t1 (Generic i) t2) f = do t <- freshVar
-                                       (a, b) <- teste t1 f
-                                       (a2, b2) <- teste t2 f
-                                       return (a ++ "-> Eff " ++ show t ++ " " ++ a2, joinStrs b b2)
-teste (Arrow t1 e t2) f = do (a, b) <- teste t1 f
-                             (a1, b1) <- teste e f
-                             (a2, b2) <- teste t2 f
-                             return (a ++ "-> " ++ a1 ++ a2, joinStrs b (joinStrs b1 b2))
-teste t f = return (show t ++ " ", [])
+saidaTipo (Row efs) f = do t <- freshVar
+                           case efs of
+                            [x, y] -> if f then return (show x ++ " ", []) else return ("Eff " ++ show t ++ " ", "Member " ++ show x ++ " " ++ show t)
+                            _ -> do str <- takeEfs t efs
+                                    return ("Eff " ++ show t ++ " ", str)
+saidaTipo (Arrow Unit e t) f = do (a, b) <- saidaTipo e f
+                                  (a1, b1) <- saidaTipo t f
+                                  return (a ++ a1, joinStrs b b1)
+saidaTipo (Arrow t1 (Generic i) t2@(Arrow a b c)) f = do t <- freshVar
+                                                         (a, b) <- saidaTipo t1 f
+                                                         (a2, b2) <- saidaTipo t2 f
+                                                         if f then 
+                                                            return (a ++ "-> " ++ a2, joinStrs b b2)
+                                                         else return (a ++ "-> Eff " ++ show t ++ " (" ++ a2 ++ ")", joinStrs b b2)
+saidaTipo (Arrow t1 e t2@(Arrow a b c)) f = do (a, b) <- saidaTipo t1 f
+                                               (a1, b1) <- saidaTipo e f
+                                               (a2, b2) <- saidaTipo t2 f
+                                               return (a ++ "-> " ++ a1 ++"("++ a2 ++ ")", joinStrs b (joinStrs b1 b2))
+saidaTipo (Arrow t1 (Generic i) t2) f = do t <- freshVar
+                                           (a, b) <- saidaTipo t1 f
+                                           (a2, b2) <- saidaTipo t2 f
+                                           return (a ++ "-> Eff " ++ show t ++ " " ++ a2, joinStrs b b2)
+saidaTipo (Arrow t1 e t2) f = do (a, b) <- saidaTipo t1 f
+                                 (a1, b1) <- saidaTipo e f
+                                 (a2, b2) <- saidaTipo t2 f
+                                 return (a ++ "-> " ++ a1 ++ a2, joinStrs b (joinStrs b1 b2))
+saidaTipo t f = return (show t ++ " ", [])
 
 --tipoEx = Arrow (Generic "a") (Row [Generic "State", Generic "b"]) (Arrow Bool (Row [Generic "Amb", Generic "State", Generic "c"]) Unit)
 
@@ -271,6 +263,9 @@ saidaDeclaracoes hd ((c:cs, tipo):xs) = do hPutStr hd "   "
                                            saidaDecl hd name tipo
                                            saidaDeclaracoes hd xs
 
+-- vai esconder as funcoes do prelude
+-- que podem ter nomes iguais aos das
+-- funcoes definidas pelo user
 takeFunctions [] [] hd = return ()
 takeFunctions [] [(x,_)] hd = do hPutStr hd x
                                  hPutStrLn hd ")\n\n"
@@ -295,21 +290,25 @@ saidaEfeitos hd ((c:cs, listaDeclaracoes):xs) = do hPutStrLn hd ("data " ++ [toU
                                                    saidaEfeitos hd xs 
 
 
-saidaDecl hd nome tipo = do let (typee, constraints) = runTI (teste tipo (isUpper (head nome))) 0
+saidaDecl hd nome tipo = do let (typee, constraints) = runTI (saidaTipo tipo (isUpper (head nome))) 0
                             if null constraints
                             then hPutStrLn hd (nome ++ " :: " ++ typee)
                             else hPutStrLn hd (nome ++ " :: (" ++ constraints ++ ") => " ++ typee)
 
 
 saidaFuncoes hd [] = return ()
-saidaFuncoes hd ((nome, tipo, fun):xs) = do saidaDecl hd nome tipo
-                                            hPutStr hd (nome ++ " = ")
-                                            hPutStrLn hd (functionTranslator fun)
-                                            hPutStrLn hd ""
-                                            saidaFuncoes hd xs
+saidaFuncoes hd ((nome, tipo, Lambda i e):xs) = do saidaDecl hd nome tipo
+                                                   hPutStr hd $ nome ++ " " ++ i ++ " = "
+                                                   case e of
+                                                    (Lambda _ _) -> hPutStrLn hd $ "\n  " ++ functionTranslator e
+                                                    _ -> hPutStrLn hd $ "do\n  " ++ functionTranslator e
+                                                   --hPutStrLn hd (functionTranslator e)
+                                                   hPutStrLn hd ""
+                                                   saidaFuncoes hd xs
 
+saida :: ([(String, [(String, Type)])], [(String, Type, Expr)]) -> IO ()
 saida (listaEfeitos, listaFuncoes) = do handle <- openFile "app/converted.hs" WriteMode
-                                        hPutStr handle cabecalho
+                                        hPutStr handle imports
                                         hPutStr handle "import Prelude hiding (print,"
                                         takeFunctions listaFuncoes (concatMap snd listaEfeitos) handle
                                         hPutStr handle console
