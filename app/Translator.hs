@@ -58,6 +58,16 @@ functionTranslator expr =
                putIndentation j
                indent
                worker e'
+           worker (Lambda i exp@(Lambda x e)) = do
+               saveIndentation
+               j <- getIndentation
+               emit "return $ \\"
+               emit i
+               emit " -> "
+               newline
+               putIndentation j
+               indent
+               worker exp
            worker (Lambda i e) = do
                saveIndentation
                j <- getIndentation

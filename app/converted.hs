@@ -115,19 +115,19 @@ test _ = do
 
 aaa :: (Member Amb t3) => Int -> Eff t0 (Int -> Eff t1 (Int -> Eff t2 (Int -> Eff t3 Int )))
 aaa a0 = 
-  return $ \b0 -> do
-   return $ \c0 -> do
-    return $ \d0 -> do
-     let bl2 _ = do 
-             let bl3 _ = do 
-                     return (a0  +  b0)
-                 bl4 _ = do 
-                     return (c0  +  d0)
-             t13 <- ( return flip `eapp` return ())
-             if t13
-             then ( return bl3 `eapp` return ())
-             else ( return bl4 `eapp` return ())
-     ( return bl2 `eapp` return ())
+  return $ \b0 -> 
+  return $ \c0 -> 
+  return $ \d0 -> do
+   let bl2 _ = do 
+           let bl3 _ = do 
+                   return (a0  +  b0)
+               bl4 _ = do 
+                   return (c0  +  d0)
+           t11 <- ( return flip `eapp` return ())
+           if t11
+           then ( return bl3 `eapp` return ())
+           else ( return bl4 `eapp` return ())
+   ( return bl2 `eapp` return ())
 
 bbb :: (Member State t1,Member Amb t3) => Int -> Eff t0 (Int -> Eff t1 (Int -> Eff t2 (Int -> Eff t3 Int )))
 bbb a0 = 
