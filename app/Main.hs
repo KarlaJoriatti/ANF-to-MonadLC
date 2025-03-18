@@ -9,5 +9,5 @@ parseCalculus s = case P.parseExpr s of
                      Right e -> T.saida e
 
 main :: IO ()
-main = do s <- readFile "app/entrada.lc"
+main = do s <- readFile "app/test.lc"
           parseCalculus s
