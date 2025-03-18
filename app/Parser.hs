@@ -44,19 +44,19 @@ data Type = Int
 type Effect = Type
 
 instance Show Parser.Operator where
-    show Parser.Sum = " + "
-    show Sub = " - "
-    show Mul = " * "
-    show Div = " `div` "
-    show Lt  = " < "
-    show Gt  = " > "
-    show Eq  = " = "
-    show EqEq = " == "
+    show Parser.Sum = " P.+ "
+    show Sub = " P.- "
+    show Mul = " P.* "
+    show Div = " `P.div` "
+    show Lt  = " P.< "
+    show Gt  = " P.> "
+    show Eq  = " P.= "
+    show EqEq = " P.== "
 
 instance Show Type where
-    show Bool = "Bool"
-    show Int = "Int"
-    show String = "String"
+    show Bool = "P.Bool"
+    show Int = "P.Int"
+    show String = "P.String"
     show Unit = "()"
     show (Generic i) = i
     show (Arrow t e t') = show t ++ " -> " ++ show e ++ " " ++ show t'
@@ -89,6 +89,7 @@ bigParser = try (do {e <- many1 effectParser; return (e, [])})
 
 pp = do {reservedOp "_"; return ()}
 
+-- we are ignoring handlers
 handlerParse = do reserved "handler"
                   i <- identifier
                   x <- many pp

@@ -26,9 +26,9 @@ runTI (TI m) n = let (t, _) = m n in t
 
 -- os tres juntos formam o cabecalho basico
 -- do arquivo de saida
-imports = "{-# LANGUAGE GADTs, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TypeOperators, DataKinds, RankNTypes #-} \nimport Control.Eff\nimport Control.Eff.Extend\nimport Debug.Trace\n\n"
+imports = "{-# LANGUAGE GADTs, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TypeOperators, DataKinds, RankNTypes #-} \nimport Control.Eff\nimport Control.Eff.Extend\nimport Debug.Trace\nimport qualified Prelude as P\n\n"
 --"handlerAction :: r ~ (f : r') => (forall v.(f v -> (v -> k) -> k) -> (Eff r a -> k) -> Arrs r v a -> f v -> k)\nhandlerAction f h q elem =\n\tf elem (qComp q h)\n\nmakeHandler :: r ~ (f : r') => (forall v.f v -> (v -> s -> Eff r' b) -> s -> Eff r' b) -> (a -> s -> Eff r' b) -> s -> Eff r a -> Eff r' b\nmakeHandler f g =\n\tPrelude.flip (handle_relay' (handlerAction f) g (Prelude.flip $ makeHandler f g))\n\n"
-eapp = "eapp :: Monad m => m (a -> m b) -> m a -> m b\neapp f x = do\n   res <- f <*> x\n   res\n\n"
+eapp = "eapp :: P.Monad m => m (a -> m b) -> m a -> m b\neapp f x = do\n   res <- f P.<*> x\n   res\n\n"
 console = "data Console x where\n    Print :: x -> Console ()\n\nprint x = send (Print x)\n\n"
 
 
@@ -36,20 +36,20 @@ functionTranslator expr =
     let (_, _, w) = runRWS (worker expr) () (2, 0) in w
        where
            worker (Free s) = do
-               emit "return "
+               emit "P.return "
                emit s
            worker (Number n) = do
-               emit "return "
+               emit "P.return "
                emit (show n)
            worker (Text s) = do
-               emit "return "
+               emit "P.return "
                emit (show s)
            worker UnitValue = do
-               emit "return ()"
+               emit "P.return ()"
            worker TrueValue = do
-               emit "return True"
+               emit "P.return P.True"
            worker FalseValue = do
-               emit "return False"
+               emit "P.return P.False"
            worker (Let i e e') = do
                j <- getIndentation
                emit (i ++ " <- ")
@@ -61,7 +61,7 @@ functionTranslator expr =
            worker (Lambda i exp@(Lambda x e)) = do
                saveIndentation
                j <- getIndentation
-               emit "return $ \\"
+               emit "P.return P.$ \\"
                emit i
                emit " -> "
                newline
@@ -71,7 +71,7 @@ functionTranslator expr =
            worker (Lambda i e) = do
                saveIndentation
                j <- getIndentation
-               emit "return $ \\"
+               emit "P.return P.$ \\"
                emit i
                emit " -> do"
                newline
@@ -101,12 +101,12 @@ functionTranslator expr =
                emit "else "
                worker e'
            worker (Application (Free "error") (Text s)) = do
-               emit "return ("
-               emit "error "
+               emit "P.return ("
+               emit "P.error "
                emit (show s)
                emit ")"
            worker (Application (Free s) e') = do
-               emit "( return "
+               emit "( P.return "
                emit s
                emit " `eapp` "
                worker e'
@@ -118,19 +118,19 @@ functionTranslator expr =
                worker e'
                emit ")"
            worker (Operation op (Free s) (Free s')) = do
-               emit "return ("
+               emit "P.return ("
                emit s
                emit (" " ++ show op ++ " ")
                emit s'
                emit ")"
            worker (Operation op (Free s) (Number n)) = do
-               emit "return ("
+               emit "P.return ("
                emit s
                emit (" " ++ show op ++ " ")
                emit (show n)
                emit ")"
            worker (Operation op (Number n) (Free s)) = do
-               emit "return ("
+               emit "P.return ("
                emit (show n)
                emit (" " ++ show op ++ " ")
                emit s
@@ -138,9 +138,9 @@ functionTranslator expr =
            worker (Operation op e e') = do
                emit "("
                emit (" (" ++ show op ++ ") ")
-               emit "<$> "
+               emit " P.<$> "
                worker e
-               emit " <*> "
+               emit " P.<*> "
                worker e'
                emit ")"
            worker (Where bindings e) = do
@@ -182,7 +182,7 @@ functionTranslator expr =
            emitMultiBind (Lambda i e) = do
                newline
                indent
-               emit "return $ \\"
+               emit "P.return P.$ \\"
                emit i
                i <- getIndentation
                emit " -> "
@@ -192,7 +192,7 @@ functionTranslator expr =
                newline
                indent
                case e of
-                 Free s -> emit ("return " ++ s)
+                 Free s -> emit ("P.return " ++ s)
                  _ -> worker e
            
            emitBindings [] f = return ()          
@@ -260,7 +260,7 @@ countParams _ = 1
 
 sendParams :: Int -> [Char]
 sendParams 0 = ""
-sendParams i = "return (\\x" ++ show i ++ " -> " ++ sendParams (i-1)
+sendParams i = "P.return (\\x" ++ show i ++ " -> " ++ sendParams (i-1)
 
 params ::  Int -> [Char]
 params 0 = ""
@@ -336,8 +336,8 @@ saidaFuncoes hd ((nome, tipo, Lambda i e):xs) = do saidaDecl hd nome tipo
 saida :: ([(String, [(String, Type)])], [(String, Type, Expr)]) -> IO ()
 saida (listaEfeitos, listaFuncoes) = do handle <- openFile "app/converted.hs" WriteMode
                                         hPutStr handle imports
-                                        hPutStr handle "import Prelude hiding (print,"
-                                        takeFunctions listaFuncoes (concatMap snd listaEfeitos) handle
+                                        --hPutStrLn handle "import Prelude hiding (print,"
+                                        --takeFunctions listaFuncoes (concatMap snd listaEfeitos) handle
                                         hPutStr handle console
                                         saidaEfeitos handle listaEfeitos
                                         hPutStrLn handle eapp
