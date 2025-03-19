@@ -22,16 +22,16 @@ eapp f x = do
 
 safedivision :: (Member Exception t1) => P.Int -> Eff t0 (P.Int -> Eff t1 P.Int )
 safedivision a0 = 
-  P.return P.$ \b0 -> do
-   let bl2 _ = do 
-           let bl3 _ = do 
-                   _ <- ( P.return throw `eapp` P.return "\"can't divide by zero\"")
-                   ( P.return bl4 `eapp` P.return ())
-               bl4 _ = do 
-                   P.return (a0  `P.div`  b0)
-           t11 <- P.return (b0  P.==  0)
-           if t11
-           then ( P.return bl3 `eapp` P.return ())
-           else ( P.return bl4 `eapp` P.return ())
-   ( P.return bl2 `eapp` P.return ())
+P.return P.$ \b0 -> do
+ let bl2 _ = do 
+         let bl3 _ = do 
+                 _ <- ( P.return throw `eapp` P.return "\"can't divide by zero\"")
+                 ( P.return bl4 `eapp` P.return ())
+             bl4 _ = do 
+                 P.return (a0  `P.div`  b0)
+         t9 <- P.return (b0  P.==  0)
+         if t9
+         then ( P.return bl3 `eapp` P.return ())
+         else ( P.return bl4 `eapp` P.return ())
+ ( P.return bl2 `eapp` P.return ())
 
