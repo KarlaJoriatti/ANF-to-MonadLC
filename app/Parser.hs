@@ -36,32 +36,37 @@ data Type = Int
           | String
           | Unit
           | Generic String
-          | Arrow Type Type Type -- tipo efeito tipo a -> e b
-          | Console
-          | Row [Effect]
+          | Arrow Type Effect Type -- a -> (e b)
           deriving (Ord, Eq)
 
-type Effect = Type
+data Effect = Console
+            | GenEff String
+            | Row [Effect]
+            deriving (Ord, Eq)
+    
 
 instance Show Parser.Operator where
-    show Parser.Sum = " P.+ "
-    show Sub = " P.- "
-    show Mul = " P.* "
-    show Div = " `P.div` "
-    show Lt  = " P.< "
-    show Gt  = " P.> "
-    show Eq  = " P.= "
-    show EqEq = " P.== "
+  show Parser.Sum = " P.+ "
+  show Sub = " P.- "
+  show Mul = " P.* "
+  show Div = " `P.div` "
+  show Lt  = " P.< "
+  show Gt  = " P.> "
+  show Eq  = " P.= "
+  show EqEq = " P.== "
 
 instance Show Type where
-    show Bool = "P.Bool"
-    show Int = "P.Int"
-    show String = "P.String"
-    show Unit = "()"
-    show (Generic i) = i
-    show (Arrow t e t') = show t ++ " -> " ++ show e ++ " " ++ show t'
-    show (Row ls) = show ls
-    show Console = "Console"
+  show Bool = "P.Bool"
+  show Int = "P.Int"
+  show String = "P.String"
+  show Unit = "()"
+  show (Generic i) = i
+  show (Arrow t e t') = show t ++ " -> " ++ show e ++ " " ++ show t'
+
+instance Show Effect where
+  show (Row ls) = show ls
+  show Console = "Console"
+  show (GenEff i) = i
 
 lingDef = emptyDef
           {
@@ -195,7 +200,7 @@ eff = try (do {reserved "console"; return Console})
         <|> genericEffect
 
 genericEffect = do (x:xs) <- identifier
-                   return (Generic (toUpper x:xs))
+                   return (GenEff (toUpper x:xs))
 
 ef = do reservedOp ","
         eff
@@ -231,11 +236,11 @@ declParser = do i <- identifier
 
 
 effectParser = do reserved "effect"
-                  i <- identifier
+                  (x:xs) <- identifier
                   reservedOp "{"
                   decls <- many declParser
                   reservedOp "}"
-                  return (i, decls)
+                  return (toUpper x : xs, decls)
 
 constructLambda [] e = return e
 constructLambda [x] e = return (Lambda x e)

@@ -17,4 +17,4 @@ safe_division = \a0 b0 ->
    bl4 _ =
     (a0 / b0)
   }
-  }
+}

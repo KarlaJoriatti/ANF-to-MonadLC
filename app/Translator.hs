@@ -26,10 +26,13 @@ runTI (TI m) n = let (t, _) = m n in t
 
 -- converted.hs header vvvvv
 imports = "{-# LANGUAGE GADTs, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TypeOperators, DataKinds, RankNTypes #-} \nimport Control.Eff\nimport Control.Eff.Extend\nimport Debug.Trace\nimport qualified Prelude as P\n\n"
---"handlerAction :: r ~ (f : r') => (forall v.(f v -> (v -> k) -> k) -> (Eff r a -> k) -> Arrs r v a -> f v -> k)\nhandlerAction f h q elem =\n\tf elem (qComp q h)\n\nmakeHandler :: r ~ (f : r') => (forall v.f v -> (v -> s -> Eff r' b) -> s -> Eff r' b) -> (a -> s -> Eff r' b) -> s -> Eff r a -> Eff r' b\nmakeHandler f g =\n\tPrelude.flip (handle_relay' (handlerAction f) g (Prelude.flip $ makeHandler f g))\n\n"
 eapp = "eapp :: P.Monad m => m (a -> m b) -> m a -> m b\neapp f x = do\n   res <- f P.<*> x\n   res\n\n"
 console = "data Console x where\n    Print :: x -> Console ()\n\nprint x = send (Print x)\n\n"
+--"handlerAction :: r ~ (f : r') => (forall v.(f v -> (v -> k) -> k) -> (Eff r a -> k) -> Arrs r v a -> f v -> k)\nhandlerAction f h q elem =\n\tf elem (qComp q h)\n\nmakeHandler :: r ~ (f : r') => (forall v.f v -> (v -> s -> Eff r' b) -> s -> Eff r' b) -> (a -> s -> Eff r' b) -> s -> Eff r a -> Eff r' b\nmakeHandler f g =\n\tPrelude.flip (handle_relay' (handlerAction f) g (Prelude.flip $ makeHandler f g))\n\n"
 -- converted.hs header ^^^^
+header = imports ++ console
+
+-- translator for functions
 
 translator :: Expr -> String
 translator expr = 
@@ -79,7 +82,6 @@ indent = do
     if a /= 0 then error "We Screwed up identation"
     else emit (replicate b ' ')
 
----------------------------
 
 -- specific translation functions
 
@@ -117,14 +119,14 @@ translateLambda i e = do
 translateIf c e e' = do
     saveIndentation
     i <- getIndentation
-    let s = runTI freshVar i
-    emit (show s)
+    let s =  ("varIf" ++ show i)
+    emit s
     emit " <- "
     worker c
     newline
     indent
     emit "if "
-    emit (show s)
+    emit s
     newline
     putIndentation i
     indent
@@ -181,7 +183,6 @@ translateWhere bindings e = do
     indent
     worker e
 
------------------------
 
 -- where binding translation
 
@@ -217,51 +218,62 @@ emitBindings ((i, Lambda x e):xs) first = do
         indent
         emitBindings xs False
 
-------------------------------------------------
+----------------------------------------------------
 
--- vai criar restricoes do tipo 'Member e t'
--- onde e vem de uma effect row
-takeEfs t [a, b] = return ("Member " ++ show a ++ " " ++ show t)
-takeEfs t (e : es) = do b <- takeEfs t es
-                        return ("Member " ++ show e ++ " " ++ show t ++ "," ++ b)
+-- This function creates restrictions 'Member e t'
+-- where 'e' comes from an effect row
+member t [a, b] = return ("Member " ++ show a ++ " " ++ show t)
+member t (e : es) = do 
+    b <- member t es
+    return ("Member " ++ show e ++ " " ++ show t ++ "," ++ b)
 
 -- juntar restricoes
-joinStrs a b | null a = b
-             | null b = a
-             | otherwise = a ++ "," ++ b
+joinMembers a b 
+    | null a = b
+    | null b = a
+    | otherwise = a ++ "," ++ b
+
+effects (Row efs) f = do 
+    t <- freshVar
+    case efs of
+        [x, y] -> if f then return (show x ++ " ", []) else return ("Eff " ++ show t ++ " ", "Member " ++ show x ++ " " ++ show t)
+        _ -> do restrics <- member t efs
+                return ("Eff " ++ show t ++ " ", restrics)
+effects e _ = return (show e ++ " ", [])
 
 
-saidaTipo (Row efs) f = do t <- freshVar
-                           case efs of
-                            [x, y] -> if f then return (show x ++ " ", []) else return ("Eff " ++ show t ++ " ", "Member " ++ show x ++ " " ++ show t)
-                            _ -> do str <- takeEfs t efs
-                                    return ("Eff " ++ show t ++ " ", str)
-saidaTipo (Arrow Unit e t) f = do (a, b) <- saidaTipo e f
-                                  (a1, b1) <- saidaTipo t f
-                                  return (a ++ a1, joinStrs b b1)
-saidaTipo (Arrow t1 (Generic i) t2@(Arrow a b c)) f = do t <- freshVar
-                                                         (a, b) <- saidaTipo t1 f
-                                                         (a2, b2) <- saidaTipo t2 f
-                                                         if f then 
-                                                            return (a ++ "-> " ++ a2, joinStrs b b2)
-                                                         else return (a ++ "-> Eff " ++ show t ++ " (" ++ a2 ++ ")", joinStrs b b2)
-saidaTipo (Arrow t1 e t2@(Arrow a b c)) f = do (a, b) <- saidaTipo t1 f
-                                               (a1, b1) <- saidaTipo e f
-                                               (a2, b2) <- saidaTipo t2 f
-                                               return (a ++ "-> " ++ a1 ++"("++ a2 ++ ")", joinStrs b (joinStrs b1 b2))
-saidaTipo (Arrow t1 (Generic i) t2) f = do t <- freshVar
-                                           (a, b) <- saidaTipo t1 f
-                                           (a2, b2) <- saidaTipo t2 f
-                                           return (a ++ "-> Eff " ++ show t ++ " " ++ a2, joinStrs b b2)
-saidaTipo (Arrow t1 e t2) f = do (a, b) <- saidaTipo t1 f
-                                 (a1, b1) <- saidaTipo e f
-                                 (a2, b2) <- saidaTipo t2 f
-                                 return (a ++ "-> " ++ a1 ++ a2, joinStrs b (joinStrs b1 b2))
+saidaTipo (Arrow Unit e t) f = do 
+    (a1, b1) <- effects e f
+    (a2, b2) <- saidaTipo t f
+    return (a1 ++ a2, joinMembers b1 b2)
+saidaTipo (Arrow t1 (GenEff i) t2@(Arrow a b c)) f = do 
+    t <- freshVar
+    (a1, b1) <- saidaTipo t1 f
+    (a2, b2) <- saidaTipo t2 f
+    if f then 
+        return (a1 ++ "-> " ++ a2, joinMembers b1 b2)
+    else 
+        return (a1 ++ "-> Eff " ++ show t ++ " (" ++ a2 ++ ")", joinMembers b1 b2)
+saidaTipo (Arrow t1 e t2@(Arrow a b c)) f = do 
+    (a1, b1) <- saidaTipo t1 f
+    (a2, b2) <- effects e f
+    (a3, b3) <- saidaTipo t2 f
+    return (a1 ++ "-> " ++ a2 ++"("++ a3 ++ ")", joinMembers b1 (joinMembers b2 b3))
+saidaTipo (Arrow t1 (GenEff i) t2) f = do 
+    t <- freshVar
+    (a1, b1) <- saidaTipo t1 f
+    (a2, b2) <- saidaTipo t2 f
+    return (a1 ++ "-> Eff " ++ show t ++ " " ++ a2, joinMembers b1 b2)
+saidaTipo (Arrow t1 e t2) f = do 
+    (a1, b1) <- saidaTipo t1 f
+    (a2, b2) <- effects e f
+    (a3, b3) <- saidaTipo t2 f
+    return (a1 ++ "-> " ++ a2 ++ a3, joinMembers b1 (joinMembers b2 b3))
 saidaTipo t f = return (show t ++ " ", [])
 
 --tipoEx = Arrow (Generic "a") (Row [Generic "State", Generic "b"]) (Arrow Bool (Row [Generic "Amb", Generic "State", Generic "c"]) Unit)
 
-countParams (Arrow t (Generic i) t') = 1 + countParams t'
+countParams (Arrow t (GenEff i) t') = 1 + countParams t'
 countParams _ = 1
 
 sendParams :: Int -> [Char]
@@ -274,76 +286,61 @@ params n = "x" ++ show n ++ " " ++ params (n-1)
 
 
 createSend hs [] = return ()
-createSend hd ((nome@(c:cs),tipo):xs) = do hPutStr hd (nome ++ " ")
-                                           case tipo of
-                                            (Arrow Unit _ _) -> hPutStrLn hd ("() = send " ++ [toUpper c] ++ cs)
-                                            t -> do let n = countParams t
-                                                    if n > 1 then
-                                                        do let a = sendParams (n-1)
-                                                               p = params (n-1)
-                                                           hPutStr hd "x0 = "
-                                                           hPutStr hd a
-                                                           hPutStr hd $ "send (" ++ [toUpper c] ++ cs ++ " x0 "
-                                                           hPutStr hd p 
-                                                           hPutStrLn hd $ concat $ replicate n ")"
-                                                    else hPutStrLn hd $ "x0 = send (" ++ [toUpper c] ++ cs ++ " x0)"
-                                           createSend hd xs
+createSend hd ((nome@(c:cs),tipo):xs) = do 
+    hPutStr hd (nome ++ " ")
+    case tipo of
+        (Arrow Unit _ _) -> hPutStrLn hd ("() = send " ++ [toUpper c] ++ cs)
+        t -> do let n = countParams t
+                if n > 1 then
+                    do let a = sendParams (n-1)
+                           p = params (n-1)
+                       hPutStr hd "x0 = "
+                       hPutStr hd a
+                       hPutStr hd $ "send (" ++ [toUpper c] ++ cs ++ " x0 "
+                       hPutStr hd p 
+                       hPutStrLn hd $ concat $ replicate n ")"
+                else hPutStrLn hd $ "x0 = send (" ++ [toUpper c] ++ cs ++ " x0)"
+    createSend hd xs
 
 
 saidaDeclaracoes _ [] = return ()
-saidaDeclaracoes hd ((c:cs, tipo):xs) = do hPutStr hd "   "
-                                           let name = toUpper c : cs
-                                           saidaDecl hd name tipo
-                                           saidaDeclaracoes hd xs
-
--- vai esconder as funcoes do prelude
--- que podem ter nomes iguais aos das
--- funcoes definidas pelo user
-takeFunctions [] [] hd = return ()
-takeFunctions [] [(x,_)] hd = do hPutStr hd x
-                                 hPutStrLn hd ")\n\n"
-takeFunctions [(x, _, _)] [] hd = do hPutStr hd x
-                                     hPutStrLn hd ")\n\n"
-takeFunctions [] ((x,_):xs) hd = do hPutStr hd x
-                                    hPutStr hd ", "
-                                    takeFunctions [] xs hd
-takeFunctions ((x, _, _):xs) [] hd = do hPutStr hd x
-                                        hPutStr hd ", "
-                                        takeFunctions xs [] hd
-takeFunctions ((nomef, _, _):xs) ys hd = do hPutStr hd nomef
-                                            hPutStr hd ", "
-                                            takeFunctions xs ys hd
+saidaDeclaracoes hd ((constName, constType):xs) = do 
+    hPutStr hd "   "
+    saidaDecl hd (toUpper (head constName) : tail constName) constType
+    saidaDeclaracoes hd xs
 
 saidaEfeitos hs [] = return ()
-saidaEfeitos hd ((c:cs, listaDeclaracoes):xs) = do hPutStrLn hd ("data " ++ [toUpper c] ++ cs ++ " x where")
-                                                   saidaDeclaracoes hd listaDeclaracoes
-                                                   hPutStrLn hd ""
-                                                   createSend hd listaDeclaracoes
-                                                   hPutStrLn hd ""
-                                                   saidaEfeitos hd xs 
+saidaEfeitos hd ((c:cs, listaDeclaracoes):xs) = do 
+    hPutStrLn hd ("data " ++ [toUpper c] ++ cs ++ " x where")
+    saidaDeclaracoes hd listaDeclaracoes
+    hPutStrLn hd ""
+    createSend hd listaDeclaracoes
+    hPutStrLn hd ""
+    saidaEfeitos hd xs 
 
 
-saidaDecl hd nome tipo = do let (typee, constraints) = runTI (saidaTipo tipo (isUpper (head nome))) 0
-                            if null constraints
-                            then hPutStrLn hd (nome ++ " :: " ++ typee)
-                            else hPutStrLn hd (nome ++ " :: (" ++ constraints ++ ") => " ++ typee)
+saidaDecl hd nome consType = do 
+    let (typee, constraints) = runTI (saidaTipo consType (isUpper (head nome))) 0
+    if null constraints
+    then hPutStrLn hd (nome ++ " :: " ++ typee)
+    else hPutStrLn hd (nome ++ " :: (" ++ constraints ++ ") => " ++ typee)
 
 
 saidaFuncoes hd [] = return ()
-saidaFuncoes hd ((nome, tipo, Lambda i e):xs) = do saidaDecl hd nome tipo
-                                                   hPutStr hd $ nome ++ " " ++ i ++ " = "
-                                                   case e of
-                                                    (Lambda _ _) -> hPutStrLn hd $ "\n  " ++ translator e
-                                                    _ -> hPutStrLn hd $ "do\n  " ++ translator e
-                                                   --hPutStrLn hd (functionTranslator e)
-                                                   hPutStrLn hd ""
-                                                   saidaFuncoes hd xs
+saidaFuncoes hd ((nome, tipo, Lambda i e):xs) = do 
+    saidaDecl hd nome tipo
+    hPutStr hd $ nome ++ " " ++ i ++ " = "
+    case e of
+        (Lambda _ _) -> hPutStrLn hd $ "\n  " ++ translator e
+        _ -> hPutStrLn hd $ "do\n  " ++ translator e
+    hPutStrLn hd ""
+    saidaFuncoes hd xs
 
 saida :: ([(String, [(String, Type)])], [(String, Type, Expr)]) -> IO ()
-saida (listaEfeitos, listaFuncoes) = do handle <- openFile "app/converted.hs" WriteMode
-                                        hPutStr handle imports
-                                        hPutStr handle console
-                                        saidaEfeitos handle listaEfeitos
-                                        hPutStrLn handle eapp
-                                        saidaFuncoes handle listaFuncoes
-                                        hClose handle
+saida (listaEfeitos, listaFuncoes) = do 
+    handle <- openFile "app/converted.hs" WriteMode
+    hPutStr handle header
+    saidaEfeitos handle listaEfeitos
+    hPutStrLn handle eapp
+    saidaFuncoes handle listaFuncoes
+    hClose handle
