@@ -44,6 +44,9 @@ data Effect = Console
             | Row [Effect]
             deriving (Ord, Eq)
     
+type Declaration = (String, Type)
+type EffectDecl = (String, [Declaration])
+
 
 instance Show Parser.Operator where
   show Parser.Sum = " P.+ "
