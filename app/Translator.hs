@@ -157,8 +157,8 @@ effectsTranslator e _ = return (show e ++ " ", [])
 
 -- joins Member restrictions
 joinMembers a b 
-    | null a = b
-    | null b = a
+    | a == [] = b
+    | b == [] = a
     | otherwise = a ++ "," ++ b
 
 
@@ -166,7 +166,7 @@ joinMembers a b
 
 functionTranslator :: Expr -> String
 functionTranslator expr = 
-    let (_, _, w) = runRWS (worker expr) () (2,0) in w
+    let (_, _, w) = runRWS (worker expr) () (2,0,0) in w
 
 worker expr = case expr of 
     Free s            -> emit "P.return " >> emit s
@@ -186,32 +186,36 @@ worker expr = case expr of
 -- string emission and identation functions
 
 emit str = do 
-    (a,b) <- get
+    (a,b,c) <- get
     tell str
-    put (a + length str, b)
+    put (a + length str, b,c)
 
 newline = do 
     tell "\n"
-    (_, b) <- get
-    put (0, b)
+    (_, b,c) <- get
+    put (0, b,c)
 
 getIndentation = do 
-    (_, b) <- get 
+    (_, b, _) <- get 
     return b
             
 putIndentation b = do
-    (a, _) <- get
-    put (a, b)
+    (a, _, c) <- get
+    put (a, b, c)
 
 saveIndentation = do
-    (a, _) <- get
+    (a, _, _) <- get
     putIndentation a
 
 indent = do
-    (a, b) <- get
+    (a, b, _) <- get
     if a /= 0 then error "We Screwed up identation"
     else emit (replicate b ' ')
 
+freshvar = do
+    (a, b, c) <- get
+    put(a, b, c+1)
+    return ("f" ++ show c)
 
 -- specific translation functions
 
@@ -246,17 +250,17 @@ translateLambda i e = do
     emit " "
     worker e
 
--- to do: gerar freshvar
 translateIf c e e' = do
     saveIndentation
     i <- getIndentation
-    emit "var"
+    var <- freshvar
+    emit var
     emit " <- "
     worker c
     newline
     indent
     emit "if "
-    emit "var"
+    emit var
     newline
     putIndentation i
     indent

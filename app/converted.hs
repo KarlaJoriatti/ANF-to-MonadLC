@@ -29,8 +29,8 @@ safedivision a0 =
                    ( P.return bl4 `eapp` P.return ())
                bl4 _ = do 
                    P.return (a0  `P.div`  b0)
-           var <- P.return (b0  P.==  0)
-           if var
+           f0 <- P.return (b0  P.==  0)
+           if f0
            then ( P.return bl3 `eapp` P.return ())
            else ( P.return bl4 `eapp` P.return ())
    ( P.return bl2 `eapp` P.return ())
