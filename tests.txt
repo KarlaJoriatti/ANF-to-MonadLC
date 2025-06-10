@@ -1,0 +1,231 @@
+effect exception {
+ throw: ∀a.string → <exception, a> unit
+}
+
+safe_division : ∀a b.int → a int → <exception, b> int
+safe_division = \a0 b0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    (if (b0 == 0)
+       then (bl3 ())
+            else (bl4 ()))
+  where {
+   bl3 _ =
+    let _ = (throw "\"can't divide by zero\"") in
+            (bl4 ()) 
+   bl4 _ =
+    (a0 / b0)
+  }
+  }
+
+fun : ∀a b.a → b int
+fun = \_ ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    2
+  }
+
+handler exception_to_maybe{
+ pure = \x0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    (just x0)
+  }
+ throw = \str0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    (nothing ())
+  }
+}
+
+max : ∀a b.int → b int → a int
+max = \n0 m0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    (if (n0 > m0)
+       then (bl3 ())
+            else (bl4 ()))
+  where {
+   bl3 _ =
+    n0
+   bl4 _ =
+    m0
+  }
+  }
+
+  
+fibonnaci : ∀a.int → a int
+fibonnaci = \n0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    let x1 = 0 in
+    (bl3 ())
+    where {
+     bl3 _ =
+      let y1 = 1 in
+      (bl4 ())
+      where {
+       bl4 _ =
+        let z1 = 1 in
+        (((((bl5 z1) y1) x1) (error "uninitialized")) ())
+        where {
+         bl5 z2 y2 x2 w1 _ =
+          (if (z2 < n0)
+             then (bl6 ())
+                  else (bl10 ()))
+        where {
+         bl6 _ =
+          let w2 = (x2 + y2) in
+          (bl7 ())
+          where {
+           bl7 _ =
+            let x3 = y2 in
+            (bl8 ())
+            where {
+             bl8 _ =
+              let y3 = w2 in
+              (bl9 ())
+              where {
+               bl9 _ =
+                let z3 = (z2 + 1) in 
+                (((((bl5 z3) y3) x3) w2) ())
+              }
+            }
+          }
+         bl10 _ =
+          y2
+        }
+        }
+      }
+    }
+  }
+
+
+test : ∀a b c.a → c int → b int
+test = \_ ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    (max (fibonnaci 10))
+  }
+
+
+effect Amb {
+ flip: ∀a.unit → <Amb, a> bool
+}
+
+effect State {
+ get: ∀a.unit → <State, a> int
+ set: ∀a.int → <State, a> unit
+ sla: ∀a b.string → b int → <State, a> bool
+}
+
+aaa : ∀a b c d.int → d int → c int → b int → <Amb, a> int
+aaa = \a0 b0 c0 d0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    (if (flip ())
+        then (bl3 ())
+             else (bl4 ()))
+   where {
+    bl3 _ =
+     (a0 + b0)
+    bl4 _ =
+     (c0 + d0)
+   }
+  }
+
+bbb : ∀a b c d.int → a int → <State, d> int → c int → <Amb, b> int
+bbb = \a0 b0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    let _ = (set 10) in
+        (bl3 ())
+        where {
+          bl3 _ =
+          ((aaa a0) b0)
+        }
+  }
+
+or : ∀a b c.bool → c b → <console, a> unit
+or = \a0 b0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    (if (a0 == true)
+       then (bl3 ())
+            else (bl4 ()))
+  where {
+   bl0 _ =
+    ()
+   bl3 _ =
+    let _ = (print true) in
+            (bl0 ())
+   bl4 _ =
+    let _ = (print b0) in
+            (bl0 ())
+  }
+  }
+
+
+xor : ∀a b.a → <Amb, b> bool
+xor = \_ ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    let p1 = (flip ()) in
+        (bl3 ())
+        where {
+         bl3 _ =
+         let q1 = (flip ()) in
+            (bl4 ())
+            where {
+                bl4 _ =
+                p1
+            }
+        }
+  }
+
+foo : ∀a.int → <Amb, State, a> bool
+foo = \threshold0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    let p1 = (flip ()) in
+        (bl3 ())
+        where {
+        bl3 _ =
+        let i1 = (get ()) in
+            (bl4 ())
+            where {
+                bl4 _ =
+                let j1 = ((sla "\"oi\"") 2) in
+                    (bl5 ())
+                    where {
+                        bl5 _ =
+                        let _ = (set (i1 + 1)) in
+                            (bl6 ())
+                            where {
+                                bl6 _ =
+                                (if (i1 > threshold0)
+                                    then (bl7 ())
+                                        else (bl8 ()))
+                                where {
+                                bl7 _ =
+                                    (xor ())
+                                bl8 _ =
+                                    false
+                                }
+                            }
+                    }
+            }
+        }
+  }
