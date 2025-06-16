@@ -2,6 +2,22 @@ effect exception {
  throw: ∀a.string → <exception, a> unit
 }
 
+handler exception_to_maybe{
+ pure = \x0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    (just x0)
+  }
+ throw = \str0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    (nothing ())
+  }
+}
+
+
 safe_division : ∀a b.int → a int → <exception, b> int
 safe_division = \a0 b0 ->
   (bl2 ())

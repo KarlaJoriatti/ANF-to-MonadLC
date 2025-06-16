@@ -1,0 +1,73 @@
+fibonnaci : ∀a.int → a int
+fibonnaci = \n0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    let x1 = 0 in
+    (bl3 ())
+    where {
+     bl3 _ =
+      let y1 = 1 in
+      (bl4 ())
+      where {
+       bl4 _ =
+        let z1 = 1 in
+        (((((bl5 z1) y1) x1) (error "uninitialized")) ())
+        where {
+         bl5 z2 y2 x2 w1 _ =
+          (if (z2 < n0)
+             then (bl6 ())
+                  else (bl10 ()))
+        where {
+         bl6 _ =
+          let w2 = (x2 + y2) in
+          (bl7 ())
+          where {
+           bl7 _ =
+            let x3 = y2 in
+            (bl8 ())
+            where {
+             bl8 _ =
+              let y3 = w2 in
+              (bl9 ())
+              where {
+               bl9 _ =
+                let z3 = (z2 + 1) in 
+                (((((bl5 z3) y3) x3) w2) ())
+              }
+            }
+          }
+         bl10 _ =
+          y2
+        }
+        }
+      }
+    }
+  }
+
+
+max : ∀a b.int → b int → a int
+max = \n0 m0 ->
+  (bl2 ())
+  where {
+    bl2 _ =
+     (if (n0 > m0)
+        then (bl3 ())
+            else (bl4 ()))
+    where {
+     bl3 _ =
+      n0
+     bl4 _ =
+      m0
+    }
+  }
+
+
+
+test : ∀a b c.a → c int → b int
+test = \_ ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    (max (fibonnaci 10))
+  }

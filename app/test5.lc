@@ -1,0 +1,7 @@
+fatorial : ∀a.int → a int
+fatorial = \n0 ->
+    (bl2 ())
+    where {
+      bl2 _ =
+      (n0 * (fatorial (n0 - 1)))
+    }

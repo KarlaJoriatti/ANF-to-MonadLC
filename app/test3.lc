@@ -1,0 +1,38 @@
+effect Amb {
+ flip: ∀a.unit → <Amb, a> bool
+}
+
+effect State {
+ get: ∀a.unit → <State, a> int
+ set: ∀a.int → <State, a> unit
+ sla: ∀a b.string → b int → <State, a> bool
+}
+
+aaa : ∀a b c d.int → d int → c int → b int → <Amb, a> int
+aaa = \a0 b0 c0 d0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    (if (flip ())
+        then (bl3 ())
+             else (bl4 ()))
+   where {
+    bl3 _ =
+     (a0 + b0)
+    bl4 _ =
+     (c0 + d0)
+   }
+  }
+
+bbb : ∀a b c d.int → a int → <State, d> int → c int → <Amb, b> int
+bbb = \a0 b0 ->
+  (bl2 ())
+  where {
+   bl2 _ =
+    let _ = (set 10) in
+        (bl3 ())
+        where {
+          bl3 _ =
+          ((aaa a0) b0)
+        }
+  }

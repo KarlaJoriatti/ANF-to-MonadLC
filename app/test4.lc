@@ -1,0 +1,31 @@
+effect Amb {
+    flip: ∀a.unit → <Amb, a> bool
+}
+effect State {
+    get: ∀a.unit → <State, a> int
+    set: ∀a.int → <State, a> unit
+}
+
+foo : ∀a b.a → <Amb, State, b> int
+foo = \_ -> (bl2 ())
+    where {
+      bl2 _ =
+        let p1 = (flip ()) in (bl3 ())
+        where {
+          bl3 _ =
+            (if p1
+                then (bl4 ())
+                    else (bl5 ()))
+            where {
+                bl4 _ =
+                  let _ = (set 1) in (bl6 ())
+                bl5 _ =
+                  let _ = (set 2) in (bl6 ())
+                bl6 _ =
+                  let y1 = (get ()) in (bl7 ())
+                    where {
+                      bl7 _ = y1
+                    }
+            }
+        }
+    }

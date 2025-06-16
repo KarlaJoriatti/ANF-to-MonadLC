@@ -1,5 +1,6 @@
 module Main where
 
+import System.Environment ( getArgs )
 import Parser as P
 import Translator as T
 
@@ -9,5 +10,7 @@ parseCalculus s = case P.parseExpr s of
                      Right e -> T.translator e
 
 main :: IO ()
-main = do s <- readFile "app/test.lc"
-          parseCalculus s
+main = do fileName <- getArgs
+          print fileName
+          arq <- readFile $ (++) "app/" $ head $ fileName
+          parseCalculus arq
