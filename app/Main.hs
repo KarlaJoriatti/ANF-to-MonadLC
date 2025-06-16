@@ -11,6 +11,5 @@ parseCalculus s = case P.parseExpr s of
 
 main :: IO ()
 main = do fileName <- getArgs
-          print fileName
           arq <- readFile $ (++) "app/" $ head $ fileName
           parseCalculus arq
