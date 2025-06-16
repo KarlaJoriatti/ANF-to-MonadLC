@@ -3,5 +3,13 @@ fatorial = \n0 ->
     (bl2 ())
     where {
       bl2 _ =
-      (n0 * (fatorial (n0 - 1)))
+        (if (n0 > 1)
+          then (bl3 ())
+            else (bl4 ()))
+      where{
+        bl3 _ =
+          (n0 * (fatorial (n0 - 1)))
+        bl4 _ =
+          1
+      }
     }
